@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "549318056398",
+    "firebase_url": "https://wuziqi-6a30b.firebaseio.com",
+    "project_id": "wuziqi-6a30b",
+    "storage_bucket": "wuziqi-6a30b.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:549318056398:android:f65b04cad78e610642339f",
+        "android_client_info": {
+          "package_name": "com.andriod.wuziqi"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "549318056398-51ja3cnd1d66l113fconhbtlqsoo32m0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.andriod.wuziqi",
+            "certificate_hash": "fe0858afc084472edf15c7911218b41f0a0f0815"
+          }
+        },
+        {
+          "client_id": "549318056398-68rp1a627nq15r70ht0j4s0vv4nubp7j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQUp3wF_PQzEn0wy5Tx9HhAkLUdolEF10"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "549318056398-68rp1a627nq15r70ht0j4s0vv4nubp7j.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
