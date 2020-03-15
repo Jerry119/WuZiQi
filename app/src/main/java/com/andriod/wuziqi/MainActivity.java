@@ -59,7 +59,9 @@ public class MainActivity extends AppCompatActivity {
     private final int SECOND_PLAYER = 2;
 
     private boolean inGame = false;
-    //private boolean myTurn = false;
+
+    private int opponentPrevMove = -1;
+    private int myPrevMove = -1;
 
     private class TextAdapter extends BaseAdapter {
         Context context;
@@ -197,6 +199,7 @@ public class MainActivity extends AppCompatActivity {
          ********** myTurn listener ************
          */
         myFirebaseRef.addValueEventListener(new ValueEventListener() {
+            @SuppressLint("ResourceType")
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
 
@@ -216,39 +219,56 @@ public class MainActivity extends AppCompatActivity {
                     // checking if opponent has moved
                     if (opponentName != null && dataSnapshot.child("Players").child(opponentName).hasChild("position")) {
                         // getting opponent's move
-                        int pos = dataSnapshot.child("Players").child(opponentName).child("position").getValue(Integer.class);
-                        if (pos != -1) {
-                            int row = pos / BOARD_SIZE;
-                            int col = pos % BOARD_SIZE;
+                        //int pos = dataSnapshot.child("Players").child(opponentName).child("position").getValue(Integer.class);
+                        opponentPrevMove = dataSnapshot.child("Players").child(opponentName).child("position").getValue(Integer.class);
+
+                        if (opponentPrevMove != -1) {
+
+                            //myPrevMove = dataSnapshot.child("Players").child(playerName).child("position").getValue(Integer.class);
+                            int row = opponentPrevMove / BOARD_SIZE;
+                            int col = opponentPrevMove % BOARD_SIZE;
 
                             GridView gv = findViewById(R.id.gridview);
-                            ImageView iv = gv.getChildAt(pos).findViewById(R.id.icon);
+                            ImageView iv = gv.getChildAt(opponentPrevMove).findViewById(R.id.icon);
 
                             int opponentID;
+
                             // marking opponent's move in board_value and board
                             if (playerID == FIRST_PLAYER) {
                                 opponentID = SECOND_PLAYER;
                                 board_value[row][col] = SECOND_PLAYER;
                                 iv.setImageResource(R.drawable.check);
+                                iv.setBackgroundColor(R.drawable.opponent_move_bg);
                             } else {
                                 opponentID = FIRST_PLAYER;
                                 board_value[row][col] = FIRST_PLAYER;
                                 iv.setImageResource(R.drawable.x_icon);
+                                iv.setBackgroundColor(R.drawable.opponent_move_bg);
+                            }
+
+                            Log.i("msg", "inside myTurn listener, myPrevMove is "+myPrevMove);
+
+                            if (myPrevMove != -1) {
+                                iv = gv.getChildAt(myPrevMove).findViewById(R.id.icon);
+                                //iv.setBackgroundColor(0);
+                                iv.setBackgroundResource(R.layout.grid_item_border);
                             }
 
                             // check if opponent won
-                            if (isWinner(opponentID, pos)) {
-
-                                Toast.makeText(getApplicationContext(), "You lost!", Toast.LENGTH_SHORT).show();
+                            if (isWinner(opponentID, opponentPrevMove) && inGame) {
 
                                 disableChessboard();
-                                inGame = false;
-
-                                myFirebaseRef.child("Players").child(playerName).child("outcome").setValue("lose");
 
                                 myFirebaseRef.child("Players").child(playerName).child("status").setValue("idle");
 
+                                myFirebaseRef.child("Players").child(playerName).child("outcome").setValue("lose");
+
+                                Toast.makeText(getApplicationContext(), "You lost!", Toast.LENGTH_SHORT).show();
+
+                                inGame = false;
+
                                 myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
+
                                 return;
                             }
                         }
@@ -350,7 +370,6 @@ public class MainActivity extends AppCompatActivity {
                  */
                 if (status.equals("ready")) {
                     updateOpponentName(myFirebaseRef);
-                    //Toast.makeText(getApplicationContext(), "looking for opponents...", Toast.LENGTH_SHORT).show();
                 }
 
                 /*
@@ -468,7 +487,7 @@ public class MainActivity extends AppCompatActivity {
 
                 Log.i("msg", "checking if pName " + pName + " exists in database");
 
-                if (dataSnapshot.child("Players").hasChild(pName)) {
+                if (dataSnapshot.child("Players").hasChild(pName) || pName.equals("no match yet")) {
                     Toast.makeText(getApplicationContext(), "The name is registered. Please try another name.", Toast.LENGTH_SHORT).show();
                 } else {
                     playerName = pName;
@@ -515,6 +534,7 @@ public class MainActivity extends AppCompatActivity {
     // listener for the chess board
     public void enableChessBoard() {
         gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @SuppressLint("ResourceType")
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                 int row = i / BOARD_SIZE;
@@ -537,6 +557,17 @@ public class MainActivity extends AppCompatActivity {
                     icon.setBackgroundColor(R.drawable.player_move_bg);
                 }
 
+                myPrevMove = i;
+
+                Log.d("msg", "inside enableChessBoard() of "+playerName+", opponentPrevMove is "+opponentPrevMove);
+
+                if (opponentPrevMove != -1) {
+                    GridView gv = findViewById(R.id.gridview);
+                    ImageView iv = gv.getChildAt(opponentPrevMove).findViewById(R.id.icon);
+                    //iv.setBackgroundColor(0);
+                    iv.setBackgroundResource(R.layout.grid_item_border);
+                }
+
                 // current player has won the game
                 if (isWinner(playerID, i)) {
                     disableChessboard();
@@ -547,13 +578,13 @@ public class MainActivity extends AppCompatActivity {
                     inGame = false;
                 }
 
-                // storing current player's move
-                myFirebaseRef.child("Players").child(playerName).child("position").setValue(i);
-
 
                 // alternating the turn
                 myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
                 Log.i("msg", "inside enableChessBoard(), setting "+playerName+"'s myTurn to false"  );
+
+                // storing current player's move
+                myFirebaseRef.child("Players").child(playerName).child("position").setValue(i);
 
                 myFirebaseRef.child("Players").child(opponentName).child("myTurn").setValue(true);
                 Log.i("msg", "inside enableChessBoard(), setting "+opponentName+"'s myTurn to true"  );
@@ -571,6 +602,8 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint("ResourceType")
     public void resetChessBoard() {
         opponentName = null;
+        opponentPrevMove = -1;
+        myPrevMove = -1;
         playerID = 0;
 
         GridView gv = findViewById(R.id.gridview);
