@@ -65,6 +65,8 @@ public class MainActivity extends AppCompatActivity {
     private int opponentPrevMove = -1;
     private int myPrevMove = -1;
 
+    private boolean opponentQuit = false;
+
 
     private class TextAdapter extends BaseAdapter {
         Context context;
@@ -160,8 +162,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        //board_value = new int[BOARD_SIZE][BOARD_SIZE];
-
         database = FirebaseDatabase.getInstance();
         myFirebaseRef = database.getReference();
 
@@ -205,6 +205,8 @@ public class MainActivity extends AppCompatActivity {
 
                         boolean myTurn = dataSnapshot.child("Players").child(playerName).child("myTurn").getValue(Boolean.class);
                         if (!myTurn && canRequestRetract) {
+                            Toast.makeText(getApplicationContext(), "You have requested to retract a move", Toast.LENGTH_SHORT).show();
+
                             myFirebaseRef.child("Players").child(opponentName).child("receiveRetractRequest").setValue(true);
 
                             myFirebaseRef.child("Players").child(playerName).child("canRequestRetract").setValue(false);
@@ -248,7 +250,6 @@ public class MainActivity extends AppCompatActivity {
                         @SuppressLint("ResourceType")
                         @Override
                         public void onClick(DialogInterface dialogInterface, int i) {
-                            //Toast.makeText(getApplicationContext(), "you clicked allow", Toast.LENGTH_SHORT).show();
                             myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
                             myFirebaseRef.child("Players").child(opponentName).child("myTurn").setValue(true);
                             myFirebaseRef.child("Players").child(opponentName).child("allowedRetract").setValue("true");
@@ -273,7 +274,6 @@ public class MainActivity extends AppCompatActivity {
                     alertDialogBuilder.setNegativeButton("decline", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialogInterface, int i) {
-                            //Toast.makeText(getApplicationContext(), "You clicked decline", Toast.LENGTH_SHORT).show();
 
                             myFirebaseRef.child("Players").child(opponentName).child("allowedRetract").setValue("false");
                         }
@@ -534,6 +534,8 @@ public class MainActivity extends AppCompatActivity {
                     }
                     else {
                         inGame = true;
+                        if (!dataSnapshot.child("Players").hasChild(opponentName))
+                            return;
                         if (dataSnapshot.child("Players").child(opponentName).child("outcome").getValue(String.class).equals("not set")) {
                             myFirebaseRef.child("Players").child(opponentName).child("status").setValue("in game");
                             myFirebaseRef.child("Players").child(opponentName).child("myTurn").setValue(true);
@@ -550,6 +552,34 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        /*
+         *
+         * ******** opponentQuit listener **********
+         */
+
+        myFirebaseRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (!inGame || !dataSnapshot.child("Players").hasChild(playerName))
+                    return;
+
+                opponentQuit = dataSnapshot.child("Players").child(playerName).child("opponentQuit").getValue(boolean.class);
+                if (opponentQuit) {
+                    Toast.makeText(getApplicationContext(), opponentName+" has just quit the game. You won!", Toast.LENGTH_SHORT).show();
+                    inGame = false;
+                    myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
+                    myFirebaseRef.child("Players").child(playerName).child("status").setValue("idle");
+                    myFirebaseRef.child("Players").child(playerName).child("outcome").setValue("win");
+
+                    disableChessboard();
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
 
     }
 
@@ -641,7 +671,8 @@ public class MainActivity extends AppCompatActivity {
 
                 Log.i("msg", "checking if pName " + pName + " exists in database");
 
-                if (dataSnapshot.child("Players").hasChild(pName) || pName.equals("no match yet")) {
+                if (pName.equals("no match yet") ||
+                        (dataSnapshot.child("Players").hasChild(pName) && !dataSnapshot.child("Players").child(pName).child("status").getValue(String.class).equals("disconnected"))) {
                     Toast.makeText(getApplicationContext(), "The name is registered. Please try another name.", Toast.LENGTH_SHORT).show();
                 } else {
                     playerName = pName;
@@ -754,8 +785,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onDestroy() {
-        FirebaseDatabase.getInstance().getReference().child("Players").child(playerName).removeValue();
-        Log.i("msg", "in onDestroy()");
+        if (inGame && !opponentQuit) {
+            myFirebaseRef.child("Players").child(opponentName).child("opponentQuit").setValue(true);
+        }
+        myFirebaseRef.child("Players").child(playerName).child("status").setValue("disconnected");
         super.onDestroy();
     }
 
@@ -792,6 +825,7 @@ public class MainActivity extends AppCompatActivity {
         myFirebaseRef.child("Players").child(playerName).child("receiveRetractRequest").setValue(false);
         myFirebaseRef.child("Players").child(playerName).child("canRequestRetract").setValue(false);
         myFirebaseRef.child("Players").child(playerName).child("allowedRetract").setValue("not set");
+        myFirebaseRef.child("Players").child(playerName).child("opponentQuit").setValue(false);
     }
 
 }
