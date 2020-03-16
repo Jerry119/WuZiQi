@@ -3,7 +3,9 @@ package com.andriod.wuziqi;
 import android.annotation.SuppressLint;
 import android.content.Context;
 
+import android.content.DialogInterface;
 import android.graphics.Color;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
@@ -62,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
 
     private int opponentPrevMove = -1;
     private int myPrevMove = -1;
+
 
     private class TextAdapter extends BaseAdapter {
         Context context;
@@ -192,8 +195,135 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 if (!inGame || myPrevMove == -1) {
                     Log.d("msg", "retract button is clicked, but not allowed yet");
+                    Toast.makeText(getApplicationContext(), "not allowed yet", Toast.LENGTH_SHORT).show();
                     return;
                 }
+                FirebaseDatabase.getInstance().getReference().addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(DataSnapshot dataSnapshot) {
+                        boolean canRequestRetract = dataSnapshot.child("Players").child(playerName).child("canRequestRetract").getValue(boolean.class);
+
+                        boolean myTurn = dataSnapshot.child("Players").child(playerName).child("myTurn").getValue(Boolean.class);
+                        if (!myTurn && canRequestRetract) {
+                            myFirebaseRef.child("Players").child(opponentName).child("receiveRetractRequest").setValue(true);
+
+                            myFirebaseRef.child("Players").child(playerName).child("canRequestRetract").setValue(false);
+                            myFirebaseRef.removeEventListener(this);
+
+                        }
+                    }
+
+                    @Override
+                    public void onCancelled(DatabaseError databaseError) {
+
+                    }
+                });
+
+            }
+        });
+
+        /*
+         *
+         * ********** receiveRetractRequest listener *****************
+         */
+        myFirebaseRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (playerName == null || !dataSnapshot.child("Players").child(playerName).hasChild("receiveRetractRequest"))
+                    return;
+
+                boolean receiveRetractRequest = dataSnapshot.child("Players").child(playerName).child("receiveRetractRequest").getValue(boolean.class);
+
+                // retract request is received from opponent
+                if (receiveRetractRequest) {
+                    Log.i("msg", playerName+" receives a retract request");
+
+                    myFirebaseRef.child("Players").child(playerName).child("receiveRetractRequest").setValue(false);
+
+                    AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(MainActivity.this);
+                    alertDialogBuilder.setMessage(opponentName+" wants to retract a move.");
+
+                    // player allows opponent to retract a move
+                    alertDialogBuilder.setPositiveButton("allow", new DialogInterface.OnClickListener() {
+                        @SuppressLint("ResourceType")
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            //Toast.makeText(getApplicationContext(), "you clicked allow", Toast.LENGTH_SHORT).show();
+                            myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
+                            myFirebaseRef.child("Players").child(opponentName).child("myTurn").setValue(true);
+                            myFirebaseRef.child("Players").child(opponentName).child("allowedRetract").setValue("true");
+
+                            // clear opponent's previous move
+                            GridView gv = findViewById(R.id.gridview);
+                            ImageView iv = gv.getChildAt(opponentPrevMove).findViewById(R.id.icon);
+                            iv.setImageResource(0);
+                            iv.setBackgroundResource(R.layout.grid_item_border);
+                            int r = opponentPrevMove/BOARD_SIZE;
+                            int c = opponentPrevMove%BOARD_SIZE;
+                            board_value[r][c] = 0;
+
+                            if (myPrevMove != -1) {
+                                ImageView iv1 = gv.getChildAt(myPrevMove).findViewById(R.id.icon);
+                                iv1.setBackgroundColor(R.drawable.player_move_bg);
+                            }
+                        }
+                    });
+
+                    // player doesn't allow opponent to retract
+                    alertDialogBuilder.setNegativeButton("decline", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            //Toast.makeText(getApplicationContext(), "You clicked decline", Toast.LENGTH_SHORT).show();
+
+                            myFirebaseRef.child("Players").child(opponentName).child("allowedRetract").setValue("false");
+                        }
+                    });
+                    AlertDialog alertDialog = alertDialogBuilder.create();
+                    alertDialog.show();
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+        /*
+         *
+         * ********** allowedRetract listener ***********
+         */
+        myFirebaseRef.addValueEventListener(new ValueEventListener() {
+            @SuppressLint("ResourceType")
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (playerName == null || !dataSnapshot.child("Players").child(playerName).hasChild("allowedRetract") || !inGame)
+                    return;
+
+                String allowedRetract = dataSnapshot.child("Players").child(playerName).child("allowedRetract").getValue(String.class);
+
+                if (allowedRetract.equals("not set"))
+                    return;
+
+                // clear my previous move
+                if (allowedRetract.equals("true")) {
+                    GridView gv = findViewById(R.id.gridview);
+                    ImageView iv = gv.getChildAt(myPrevMove).findViewById(R.id.icon);
+                    iv.setImageResource(0);
+                    iv.setBackgroundResource(R.layout.grid_item_border);
+                    int r = myPrevMove/BOARD_SIZE;
+                    int c = myPrevMove%BOARD_SIZE;
+                    board_value[r][c] = 0;
+
+                }
+                else {
+                    Toast.makeText(getApplicationContext(), opponentName+" didn't allow you to retract", Toast.LENGTH_SHORT).show();
+                }
+                myFirebaseRef.child("Players").child(playerName).child("allowedRetract").setValue("not set");
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
 
             }
         });
@@ -452,12 +582,19 @@ public class MainActivity extends AppCompatActivity {
 
                 Log.i("msg", "inside updateOpponentName(), "+playerName+"'s ID is "+playerID);
 
-                if (!inGame && playerID == FIRST_PLAYER && opponentName != null && !opponentName.equals("no match yet")) {
-                    inGame = true;
-                    TextView p2 = findViewById(R.id.p2);
-                    p2.setText("Player2: " + opponentName);
-                    Toast.makeText(getApplicationContext(), "Game starts...", Toast.LENGTH_SHORT).show();
+                if (!inGame && playerID == FIRST_PLAYER && opponentName != null) {
+                    if (!opponentName.equals("no match yet")) {
+                        TextView p2 = findViewById(R.id.p2);
+                        p2.setText("Player2: " + opponentName);
+                        Toast.makeText(getApplicationContext(), "Game starts...", Toast.LENGTH_SHORT).show();
+                        inGame = true;
+                    }
+                    else {
+                        TextView p2 = findViewById(R.id.p2);
+                        p2.setText("Player2: ");
+                    }
                 }
+
 
                 if (playerID != 0)
                     return;
@@ -600,10 +737,16 @@ public class MainActivity extends AppCompatActivity {
                 myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
                 Log.i("msg", "inside enableChessBoard(), setting "+playerName+"'s myTurn to false"  );
 
+                // allow player to request retract after his move
+                myFirebaseRef.child("Players").child(playerName).child("canRequestRetract").setValue(true);
+
                 // storing current player's move
                 myFirebaseRef.child("Players").child(playerName).child("position").setValue(i);
 
                 myFirebaseRef.child("Players").child(opponentName).child("myTurn").setValue(true);
+
+                myFirebaseRef.child("Players").child(opponentName).child("canRequestRetract").setValue(false);
+
                 Log.i("msg", "inside enableChessBoard(), setting "+opponentName+"'s myTurn to true"  );
 
             }
@@ -646,6 +789,9 @@ public class MainActivity extends AppCompatActivity {
         myFirebaseRef.child("Players").child(playerName).child("outcome").setValue("not set");
         myFirebaseRef.child("Players").child(playerName).child("position").setValue(-1);
         myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
+        myFirebaseRef.child("Players").child(playerName).child("receiveRetractRequest").setValue(false);
+        myFirebaseRef.child("Players").child(playerName).child("canRequestRetract").setValue(false);
+        myFirebaseRef.child("Players").child(playerName).child("allowedRetract").setValue("not set");
     }
 
 }
