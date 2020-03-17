@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 
 import android.content.DialogInterface;
+import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -157,10 +158,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    @SuppressLint("SourceLockedOrientationActivity")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         database = FirebaseDatabase.getInstance();
         myFirebaseRef = database.getReference();
@@ -360,6 +363,7 @@ public class MainActivity extends AppCompatActivity {
                 boolean myTurn = dataSnapshot.child("Players").child(playerName).child("myTurn").getValue(boolean.class);
 
                 Log.i("msg", playerName+"'s myTurn is "+myTurn);
+                Log.i("msg", "inside myTurn listener, "+playerName+"'s inGame: "+inGame);
 
                 if (myTurn && inGame) {
 
@@ -414,15 +418,39 @@ public class MainActivity extends AppCompatActivity {
 
                                 myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
 
+                                //myFirebaseRef.removeEventListener(this);
+
                                 Toast.makeText(getApplicationContext(), "You lost!", Toast.LENGTH_SHORT).show();
 
                                 return;
                             }
+                            // chessboard is filled, it's a tie game
+                            if (checkIfTied()) {
+                                Log.i("msg", "it's a tie");
+
+                                TextView tv = findViewById(R.id.resultArea);
+                                tv.setText("It's a tied game.");
+                                Toast.makeText(getApplicationContext(), "no winner is determined", Toast.LENGTH_SHORT).show();
+                                inGame = false;
+                                myFirebaseRef.child("Players").child(playerName).child("status").setValue("idle");
+
+                                myFirebaseRef.child("Players").child(playerName).child("outcome").setValue("no set");
+
+                                myFirebaseRef.child("Players").child(playerName).child("canRequestRetract").setValue(false);
+
+                                myFirebaseRef.child("Players").child(opponentName).child("canRequestRetract").setValue(false);
+
+                                myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
+                               // myFirebaseRef.removeEventListener(this);
+                                return;
+                            }
+
                         }
                     }
 
                     TextView result = findViewById(R.id.resultArea);
                     result.setText("It's your turn to move...");
+
                     enableChessBoard();
                 } else {
                     if (inGame) {
@@ -492,7 +520,6 @@ public class MainActivity extends AppCompatActivity {
 
                 if (status != null && status.equals("idle")) {
 
-                    //inGame = false;
                     if (outcome != null && outcome.equals("win")) {
                         TextView result = findViewById(R.id.resultArea);
                         result.setText(playerName+" has won!");
@@ -564,7 +591,8 @@ public class MainActivity extends AppCompatActivity {
                     return;
 
                 opponentQuit = dataSnapshot.child("Players").child(playerName).child("opponentQuit").getValue(boolean.class);
-                if (opponentQuit) {
+                String opponentStatus = dataSnapshot.child("Players").child(opponentName).child("status").getValue(String.class);
+                if (opponentQuit || opponentStatus.equals("disconnected")) {
                     Toast.makeText(getApplicationContext(), opponentName+" has just quit the game. You won!", Toast.LENGTH_SHORT).show();
                     inGame = false;
                     myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
@@ -763,6 +791,29 @@ public class MainActivity extends AppCompatActivity {
                     inGame = false;
                 }
 
+                // chessboard is filled, it's a tie game
+                if (inGame && checkIfTied()) {
+                    TextView result = findViewById(R.id.resultArea);
+                    result.setText("It's a tied game.");
+                    Toast.makeText(getApplicationContext(), "no winner is determined", Toast.LENGTH_SHORT).show();
+                    inGame = false;
+                    myFirebaseRef.child("Players").child(playerName).child("status").setValue("idle");
+
+                    myFirebaseRef.child("Players").child(playerName).child("position").setValue(i);
+
+                    myFirebaseRef.child("Players").child(playerName).child("outcome").setValue("no set");
+
+                    myFirebaseRef.child("Players").child(playerName).child("canRequestRetract").setValue(false);
+
+                    myFirebaseRef.child("Players").child(opponentName).child("canRequestRetract").setValue(false);
+
+                    myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
+
+                    myFirebaseRef.child("Players").child(opponentName).child("myTurn").setValue(true);
+
+                    return;
+                }
+
 
                 // alternating the turn
                 myFirebaseRef.child("Players").child(playerName).child("myTurn").setValue(false);
@@ -784,11 +835,21 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    public boolean checkIfTied() {
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            for (int j = 0; j < BOARD_SIZE; j++) {
+                if (board_value[i][j] == 0)
+                    return false;
+            }
+        }
+        return true;
+    }
+
     public void onDestroy() {
+        myFirebaseRef.child("Players").child(playerName).child("status").setValue("disconnected");
         if (inGame && !opponentQuit) {
             myFirebaseRef.child("Players").child(opponentName).child("opponentQuit").setValue(true);
         }
-        myFirebaseRef.child("Players").child(playerName).child("status").setValue("disconnected");
         super.onDestroy();
     }
 
