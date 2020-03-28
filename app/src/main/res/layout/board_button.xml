@@ -11,4 +11,5 @@
         android:scaleType="fitXY"
         android:layout_gravity="center_horizontal"
         android:layout_height="30dp" />
+
 </LinearLayout>

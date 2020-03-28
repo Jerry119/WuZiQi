@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="bottom">
+
+    <TextView
+        android:id="@+id/game_fragment"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="GAME"
+        android:textSize="30dp"
+        android:gravity="center"
+        android:background="@drawable/current_fragment_color"
+        android:layout_weight="1"/>
+
+    <TextView
+        android:id="@+id/chat_fragment"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="CHAT"
+        android:textSize="30dp"
+        android:gravity="center"
+        android:background="@drawable/unused_fragment_color"
+        android:layout_weight="1"/>
+
+</LinearLayout>
