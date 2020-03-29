@@ -3,14 +3,49 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:id="@+id/chat_window">
+    android:id="@+id/chat_window"
+    android:orientation="vertical">
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="This is chat room"
-        android:textSize="50dp"
-        android:gravity="center"/>
+        android:layout_height="wrap_content"
+        android:layout_weight="2"
+        android:orientation="vertical">
+       <ListView
+           android:layout_width="match_parent"
+           android:id="@+id/message_view"
+           android:layout_height="wrap_content"
+           android:divider="#08088A"
+           />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#fff"
+        android:orientation="horizontal">
+
+        <EditText
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:id="@+id/message"
+            android:ems="10"
+            android:backgroundTint="#6E6E6E"
+            android:hint="Write a message"
+            android:inputType="text"
+            />
+        <ImageButton
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/send"
+            android:background="@drawable/ic_send_black_24dp"
+            android:scaleType="fitCenter"
+            android:layout_marginLeft="5dp"
+            android:layout_gravity="center"
+            android:layout_centerVertical="true"/>
+
+    </LinearLayout>
 
 
 </LinearLayout>

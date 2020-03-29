@@ -4,33 +4,46 @@
     android:layout_height="match_parent">
 
 
-    <include layout="@layout/fragment_chat"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone"></include>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:id="@+id/game_window">
+        android:id="@+id/game_window"
+        >
 
         <include layout="@layout/game_ui"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
+            android:layout_height="wrap_content" />
 
         <include layout="@layout/board_button_ui"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
+            android:layout_height="wrap_content" />
 
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-        <include layout="@layout/fragment_button"
+        android:layout_height="match_parent"
+        android:id="@+id/chat_container"
+        android:layout_marginBottom="40dp">
+        <include
+            layout="@layout/fragment_chat"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_width="match_parent" />
+            android:visibility="gone"></include>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/fragment_button_container">
+
+        <include
+            layout="@layout/fragment_button"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
     </LinearLayout>
 
 

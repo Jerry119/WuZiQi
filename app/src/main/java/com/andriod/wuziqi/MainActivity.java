@@ -21,14 +21,19 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.GridView;
 
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -47,12 +52,14 @@ import java.util.List;
 import java.util.Queue;
 
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements Animation.AnimationListener {
 
     private FirebaseDatabase database;
     private DatabaseReference myFirebaseRef;
 
     private GridView gridView;
+    private ListView listView;
+
     private String playerName;
 
     private int[][] board_value;
@@ -69,6 +76,29 @@ public class MainActivity extends AppCompatActivity {
     private final int SECOND_PLAYER = 2;
 
     private User user;
+
+    private Animation animation;
+
+    private MessageAdapter messageAdapter;
+
+    private LinearLayout gameWindow;
+    private LinearLayout chatWindow;
+
+
+    @Override
+    public void onAnimationStart(Animation animation) {
+
+    }
+
+    @Override
+    public void onAnimationEnd(Animation animation) {
+
+    }
+
+    @Override
+    public void onAnimationRepeat(Animation animation) {
+
+    }
 
     protected enum Status {
         idle, in_game, ready, disconnected;
@@ -181,8 +211,8 @@ public class MainActivity extends AppCompatActivity {
 
         user = new User();
 
-
-        //findViewById(R.id.chat_window).setVisibility(View.GONE);
+        gameWindow = findViewById(R.id.game_window);
+        chatWindow = findViewById(R.id.chat_window);
 
         /*
          ******** Ready Button *********
@@ -252,6 +282,7 @@ public class MainActivity extends AppCompatActivity {
 
                 // retract request is received from opponent
                 if (receiveRetractRequest) {
+
                     Log.i("msg", playerName + " receives a retract request");
 
                     myFirebaseRef.child("Players").child(playerName).child("receiveRetractRequest").setValue(false);
@@ -294,6 +325,7 @@ public class MainActivity extends AppCompatActivity {
                     });
                     AlertDialog alertDialog = alertDialogBuilder.create();
                     alertDialog.show();
+
                 }
             }
 
@@ -354,7 +386,6 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                //if (!inGame)
                 if (!user.getPlaying())
                     return;
 
@@ -365,7 +396,6 @@ public class MainActivity extends AppCompatActivity {
                 if (myTurn) {
 
                     // checking if opponent has moved
-                    //if (opponentName != null && dataSnapshot.child("Players").child(opponentName).hasChild("position")) {
                     if (user.getOpponentName() != null){
                         int opponentPrevMove = dataSnapshot.child("Players").child(user.getOpponentName()).child("position").getValue(Integer.class);
 
@@ -399,10 +429,15 @@ public class MainActivity extends AppCompatActivity {
                                 iv.setBackgroundResource(R.layout.grid_item_border);
                             }
 
+
+                            // start blinking effect for my turn to move
+                            if (gameWindow.getVisibility() == View.GONE) {
+                                TextView game_frag = findViewById(R.id.game_fragment);
+                                startAnimationEffect(game_frag);
+                            }
+
                             // check if opponent won
                             if (isWinner(opponentID, opponentPrevMove)) {
-
-                                //inGame = false;
                                 user.setPlaying(false);
 
                                 disableChessboard();
@@ -426,7 +461,6 @@ public class MainActivity extends AppCompatActivity {
                                 TextView tv = findViewById(R.id.resultArea);
                                 tv.setText("It's a tied game.");
                                 Toast.makeText(getApplicationContext(), "no winner is determined", Toast.LENGTH_SHORT).show();
-                                //inGame = false;
                                 user.setPlaying(false);
 
                                 myFirebaseRef.child("Players").child(playerName).child("status").setValue("idle");
@@ -451,7 +485,6 @@ public class MainActivity extends AppCompatActivity {
 
                     enableChessBoard();
                 } else {
-                    //if (inGame) {
                     if (user.getPlaying()) {
                         TextView result = findViewById(R.id.resultArea);
                         result.setText("Wait for your turn to move...");
@@ -602,29 +635,30 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        messageAdapter = new MessageAdapter(this);
+        listView = findViewById(R.id.message_view);
+        listView.setAdapter(messageAdapter);
+        listView.setTranscriptMode(ListView.TRANSCRIPT_MODE_NORMAL);
+        listView.setStackFromBottom(true);
+
 
         /*
          *
-         * *********** message listener
+         * *********** my message listener
          */
-       /* myFirebaseRef.addValueEventListener(new ValueEventListener() {
+        myFirebaseRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 if (!dataSnapshot.hasChild("Players") || playerName == null)
                     return;
                 Status s = user.getStatus();
 
-                if (s == Status.in_game || (s == Status.idle && opponentName != null)) {
+                if (s == Status.in_game || (s == Status.idle && !user.getOpponentName().equals("no match yet"))) {
                     String myMsg = dataSnapshot.child("Players").child(playerName).child("message").getValue(String.class);
-                    if (!myMsg.equals("RESERVED_MSG")) {
-                        TextView chat_history = findViewById(R.id.chat_history);
-                        chat_history.append("\n" + playerName + ": " + myMsg);
-                    }
-
-                    String opponentMsg = dataSnapshot.child("Players").child(opponentName).child("message").getValue(String.class);
-                    if (!opponentMsg.equals("RESERVED_MSG")) {
-                        TextView chat_history = findViewById(R.id.chat_history);
-                        chat_history.append("\n" + opponentName + ": " + opponentMsg);
+                    if (myMsg != null && !myMsg.equals("RESERVED_MSG")) {
+                        Message message = new Message(myMsg, "myself");
+                        messageAdapter.addMessage(message);
+                        myFirebaseRef.child("Players").child(playerName).child("message").setValue("RESERVED_MSG");
                     }
                 }
             }
@@ -633,37 +667,105 @@ public class MainActivity extends AppCompatActivity {
             public void onCancelled(DatabaseError databaseError) {
 
             }
-        });*/
+        });
+
+        /*
+         *
+         * ************* opponent message listener
+         */
+        myFirebaseRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (!dataSnapshot.hasChild("Players") || playerName == null || user.getOpponentName().equals("no match yet"))
+                    return;
+
+                Status s = user.getStatus();
+
+                String opponentMsg = dataSnapshot.child("Players").child(user.getOpponentName()).child("message").getValue(String.class);
+                if (opponentMsg != null && !opponentMsg.equals("RESERVED_MSG")) {
+                    Message message = new Message(opponentMsg, user.getOpponentName());
+                    messageAdapter.addMessage(message);
+                    if (chatWindow.getVisibility() == View.GONE) {
+                        TextView chat_frag = findViewById(R.id.chat_fragment);
+                        startAnimationEffect(chat_frag);
+                    }
+                }
+
+
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+        ImageButton sendButton = findViewById(R.id.send);
+        sendButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Status s = user.getStatus();
+                if (s == Status.ready || (s == Status.idle && user.getOpponentName().equals("no match yet"))) {
+                    Toast.makeText(getApplicationContext(), "Wait until you are in a game", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                EditText msg = findViewById(R.id.message);
+                String message = msg.getText().toString();
+                if (message.length() == 0)
+                    return;
+                myFirebaseRef.child("Players").child(playerName).child("message").setValue(message);
+                msg.setText("");
+                InputMethodManager inputMethodManager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                View focusedView = getCurrentFocus();
+                if (focusedView != null)
+                    inputMethodManager.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), InputMethodManager.HIDE_NOT_ALWAYS);
+            }
+        });
 
         final TextView chat_window = findViewById(R.id.chat_fragment);
         chat_window.setOnClickListener(new View.OnClickListener() {
             @SuppressLint("ResourceType")
             @Override
             public void onClick(View view) {
-                LinearLayout gameWindow = findViewById(R.id.game_window);
                 gameWindow.setVisibility(View.GONE);
-                LinearLayout chatWindow = findViewById(R.id.chat_window);
                 chatWindow.setVisibility(View.VISIBLE);
+
+                if (animation != null && animation.hasStarted()) {
+                    chat_window.clearAnimation();
+                }
+
                 chat_window.setBackgroundResource(R.drawable.current_fragment_color);
                 TextView game = findViewById(R.id.game_fragment);
                 game.setBackgroundResource(R.drawable.unused_fragment_color);
+
             }
         });
+
 
         final TextView game_window = findViewById(R.id.game_fragment);
         game_window.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                LinearLayout chatWindow = findViewById(R.id.chat_window);
                 chatWindow.setVisibility(View.GONE);
-                LinearLayout gameWindow = findViewById(R.id.game_window);
                 gameWindow.setVisibility(View.VISIBLE);
+
                 game_window.setBackgroundResource(R.drawable.current_fragment_color);
+
+                if (animation != null && animation.hasStarted()) {
+                    game_window.clearAnimation();
+                }
 
                 TextView chat = findViewById(R.id.chat_fragment);
                 chat.setBackgroundResource(R.drawable.unused_fragment_color);
             }
         });
+    }
+
+    public void startAnimationEffect(TextView textView) {
+        animation = AnimationUtils.loadAnimation(this, R.anim.blink_effect);
+        animation.setAnimationListener(this);
+        textView.startAnimation(animation);
     }
 
     public void updateOpponentName() {
@@ -673,7 +775,6 @@ public class MainActivity extends AppCompatActivity {
                 if (user.getPlaying())
                     return;
 
-                //String status = dataSnapshot.child("Players").child(playerName).child("status").getValue(String.class);
                 Status status = user.getStatus();
 
                 String opponentName;
@@ -707,7 +808,6 @@ public class MainActivity extends AppCompatActivity {
                         TextView p2 = findViewById(R.id.p2);
                         p2.setText("Player2: " + opponentName);
                         Toast.makeText(getApplicationContext(), "Game starts...", Toast.LENGTH_SHORT).show();
-                        //findViewById(R.id.send).setClickable(true);
                         user.setPlaying(true);
                         user.setStatus(Status.in_game);
                     }
@@ -722,7 +822,6 @@ public class MainActivity extends AppCompatActivity {
                     return;
 
                 if (opponentName.equals("no match yet")) {
-                    //playerID = FIRST_PLAYER;
                     user.setUserID(FIRST_PLAYER);
                     TextView p1 = findViewById(R.id.p1);
                     p1.setText("Player1: " + playerName);
@@ -925,9 +1024,15 @@ public class MainActivity extends AppCompatActivity {
     public void resetChessBoard() {
 
         user.setUserID(0);
-        user.setOpponentName(null);
+
+        if (!user.getOpponentName().equals("no match yet"))
+            myFirebaseRef.child("Players").child(user.getOpponentName()).child("opponent").setValue("no match yet");
+
+        user.setOpponentName("no match yet");
         user.setMyPrevMove(-1);
         user.setOpponentPrevMove(-1);
+
+        messageAdapter.clearScreen();
 
         GridView gv = findViewById(R.id.gridview);
 
