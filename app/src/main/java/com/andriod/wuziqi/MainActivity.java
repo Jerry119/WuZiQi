@@ -325,6 +325,8 @@ public class MainActivity extends AppCompatActivity implements Animation.Animati
                     });
                     AlertDialog alertDialog = alertDialogBuilder.create();
                     alertDialog.show();
+                    alertDialog.setCancelable(false);
+                    alertDialog.setCanceledOnTouchOutside(false);
 
                 }
             }
